@@ -1,0 +1,7 @@
+{
+    "project": "ResourceMonitor",
+    "team": "Resource Monitor App",
+    "pat": "your_pat_goes_here",
+    "template_path": "template.pptx",
+    "slide_index": 10
+  }

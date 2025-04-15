@@ -2,16 +2,25 @@ from pptx import Presentation
 from pptx.util import Inches
 from datetime import datetime
 from base64 import b64encode
-import requests
 from pptx.enum.shapes import PP_PLACEHOLDER
 from collections import defaultdict
+import requests
+import json
 
 
-# Your variables
-project = "ResourceMonitor"
-team = "Resource Monitor App"
-pat = "your_pat_here"
-template_path = "template.pptx"
+
+def load_config(config_file="config.json"):
+    with open(config_file, "r") as f:
+        return json.load(f)
+
+# Get configuration
+config = load_config()
+
+# Access configuration variables
+project = config["project"]
+team = config["team"]
+pat = config["pat"]
+template_path = config["template_path"]
 
 headers = {
     "Authorization": "Basic " + b64encode(f":{pat}".encode()).decode(),
@@ -82,7 +91,6 @@ def get_work_item_details_w_features(ids):
         print("Failed to fetch work item details", response.status_code)
         return []
 
-
 def update_presentation_with_user_stories(user_stories, template_path, slide_index):
     prs = Presentation(template_path)
     slide = prs.slides[slide_index]
@@ -123,24 +131,13 @@ def update_presentation_with_user_stories(user_stories, template_path, slide_ind
 
 
 
-
 # Get work items in the iteration (Sprint)
 url = f"https://tfs-product.cmf.criticalmanufacturing.com/Products/{project}/{team}/_apis/work/teamsettings/iterations?$timeframe=current&api-version=7.0"
 print('URL ', url)
 iteration_res = requests.get(url, headers=headers, verify=False).json()
 
 # (Optional) Log the iterations to make sure we’re targeting the right one
-print('IT_RES ', iteration_res)
 iteration_id = iteration_res["value"][0]["id"]
-
-
-# View response structure
-for iteration in iteration_res["value"]:
-    print("Iteration:", iteration["name"])
-    print("ID:", iteration["id"])
-    print("Path:", iteration["path"])
-    print("URL:", iteration["url"])
-    print("--------")
 
 # Get work items in that iteration
 # Note: May need to hardcode the iteration ID if this doesn’t return the sprint you want
@@ -162,11 +159,8 @@ for item in backlog_res['workItemRelations']:
         user_story_ids.append(target_id)
 
 # Output the User Story IDs
-print("User Story IDs:", user_story_ids)
 
 user_stories = get_work_item_details_w_features(user_story_ids)
-
-print('aaaaaaaaaaaaaaaaaaaa',user_stories)
 
 update_presentation_with_user_stories(user_stories, template_path, 10)
 

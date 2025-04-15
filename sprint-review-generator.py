@@ -4,9 +4,10 @@ from datetime import datetime
 from base64 import b64encode
 from pptx.enum.shapes import PP_PLACEHOLDER
 from collections import defaultdict
+from pptx.dml.color import RGBColor
+
 import requests
 import json
-
 
 
 def load_config(config_file="config.json"):
@@ -57,6 +58,7 @@ def get_work_item_details_w_features(ids):
         for item in data['value']:
             story_id = item['id']
             title = item['fields'].get('System.Title', 'No Title')
+            state = item['fields'].get('System.State', 'Unknown')
             parent_id = None
 
             # Look for parent (Feature) in relations
@@ -68,7 +70,8 @@ def get_work_item_details_w_features(ids):
             user_stories.append({
                 'id': story_id,
                 'title': title,
-                'parent_id': parent_id
+                'parent_id': parent_id,
+                'state': state
             })
 
         # Fetch feature titles
@@ -92,6 +95,15 @@ def get_work_item_details_w_features(ids):
         return []
 
 def update_presentation_with_user_stories(user_stories, template_path, slide_index):
+    
+    state_colors = {
+        "Active": RGBColor(0, 112, 192),     # Blue
+        "New": RGBColor(255, 165, 0),        # Orange
+        "Resolved": RGBColor(0, 176, 80),    # Green
+        "Closed": RGBColor(0, 176, 80),      # Green
+    }
+
+    
     prs = Presentation(template_path)
     slide = prs.slides[slide_index]
 
@@ -103,7 +115,7 @@ def update_presentation_with_user_stories(user_stories, template_path, slide_ind
             break
 
     if not body_placeholder:
-        raise ValueError("No BODY placeholder found on the specified slide.")
+       raise ValueError("No BODY placeholder found on the specified slide.")
 
     text_frame = body_placeholder.text_frame
     text_frame.clear()
@@ -115,16 +127,29 @@ def update_presentation_with_user_stories(user_stories, template_path, slide_ind
 
     # Add grouped stories to the slide
     for feature, stories in stories_by_feature.items():
-        title_para = text_frame.add_paragraph()
-        title_para.text = f"{feature}:"
-        title_para.level = 0
-        title_para.bold = True
+        # Add the feature as a top-level bullet (level 0)
+        feature_para = text_frame.add_paragraph()
+        feature_para.text = f"{feature}:"
+        feature_para.level = 0
+        feature_para.bold = True
+        feature_para.bullet = True
+        feature_para.bullet_style = 3  # Square bullets for feature
 
+        # Add user stories under this feature as second-level bullets (level 1)
         for story in stories:
-            para = text_frame.add_paragraph()
-            para.text = f"{story['id']} [{story['title']}]"
-            para.level = 1
+            story_para = text_frame.add_paragraph()
+            story_para.text = f"{story['id']} [{story['title']}]"
+            story_para.level = 1
+            story_para.bullet = True
+            story_para.bullet_style = 2  # Square bullets for user stories
+            story_para.left_indent = Inches(0.5)  # Indentation for sub-level
+            # Set text color based on story state
+            state = story.get("state", "")
+            run = story_para.runs[0]
+            run.font.color.rgb = state_colors.get(state, RGBColor(0, 0, 0))  # fallback to black
 
+
+    # Save the updated presentation
     filename = f"MeetingMinutes-{datetime.today().strftime('%d%m%Y')}-SprintReview.pptx"
     prs.save(filename)
     print(f"Saved: {filename}")

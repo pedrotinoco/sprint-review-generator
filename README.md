@@ -26,8 +26,8 @@ This script automates the generation of a Sprint Review PowerPoint presentation 
 
 1. **Clone the repo**  
    ```bash
-   git clone https://your.repo.url/ppt-generator.git
-   cd ppt-generator
+   git clone https://github.com/pedrotinoco/sprint-review-generator.git
+   cd sprint-review-generator
 2. **Install Dependencies**
    - pip install -r requirements.txt
 

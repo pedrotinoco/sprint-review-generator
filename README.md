@@ -28,3 +28,15 @@ This script automates the generation of a Sprint Review PowerPoint presentation 
    ```bash
    git clone https://your.repo.url/ppt-generator.git
    cd ppt-generator
+2. **Install Dependencies**
+   - pip install -r requirements.txt
+
+3. **Configure the config.json**
+   - project: The name of the Azure DevOps project.
+   - team: The team within the Azure DevOps project.
+   - pat: Your Personal Access Token (PAT) from Azure DevOps.
+   - template_path: The path to your PowerPoint template file (.pptx).
+
+4. **Get this running**
+   ```bash
+   python sprint_review_generator.py

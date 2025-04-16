@@ -28,6 +28,13 @@ headers = {
     "Content-Type": "application/json"
 }
 
+state_colors = {
+    "Active": RGBColor(0, 112, 192),     # Blue
+    "New": RGBColor(255, 165, 0),        # Orange
+    "Resolved": RGBColor(0, 176, 80),    # Green
+    "Closed": RGBColor(0, 176, 80),      # Green
+}
+
 def get_work_item_type(work_item_id):
     # Define the URL to fetch work item details (replace with your Azure DevOps base URL)
     work_item_url = f"https://tfs-product.cmf.criticalmanufacturing.com/Products/_apis/wit/workItems/{work_item_id}?api-version=6.0"
@@ -83,26 +90,61 @@ def get_work_item_details_w_features(ids):
             if feature_response.status_code == 200:
                 feature_data = feature_response.json()
                 for feat in feature_data['value']:
-                    features[feat['id']] = feat['fields'].get('System.Title', 'Untitled Feature')
+                    features[feat['id']] = {
+                        'id': feat['id'],
+                        'title': feat['fields'].get('System.Title', 'Untitled Feature'),
+                        'state': feat['fields'].get('System.State', 'unknown')
+                    }
 
         # Attach feature titles to user stories
         for story in user_stories:
-            story['feature'] = features.get(story['parent_id'], 'No Feature')
+            story['feature'] = features.get(story['parent_id'], {'id': None, 'title': 'No Feature', 'state': 'Unknown'})
 
         return user_stories
     else:
         print("Failed to fetch work item details", response.status_code)
         return []
 
-def update_presentation_with_user_stories(user_stories, template_path, slide_index):
-    
-    state_colors = {
-        "Active": RGBColor(0, 112, 192),     # Blue
-        "New": RGBColor(255, 165, 0),        # Orange
-        "Resolved": RGBColor(0, 176, 80),    # Green
-        "Closed": RGBColor(0, 176, 80),      # Green
-    }
+def create_feature_row(feature_id, feature_title, feature_state, text_frame):
+    feature_para = text_frame.add_paragraph()
+    feature_para.level = 0
+    feature_para.bullet = False
 
+    feature_bullet_run = feature_para.add_run()
+    feature_bullet_run.text = "▪ "
+    feature_bullet_run.font.color.rgb = state_colors.get(feature_state, RGBColor(0, 0, 0))
+    feature_bullet_run.font.name = 'Segoe UI Light'
+
+    run = feature_para.add_run()
+    run.text = f"[Feature {feature_id}] - {feature_title}"
+    run.font.bold = True
+    run.font.name = 'Segoe UI Light'
+
+def create_user_story_row(story, text_frame):
+
+    story_para = text_frame.add_paragraph()
+    story_para.level = 1
+    story_para.bullet = False  # Disable bullet
+    story_para.left_indent = Inches(0.5)  # Indentation for sub-level
+    # Set text color based on story state
+    story_state = story.get("state", "")
+    
+    story_bullet_run = story_para.add_run()
+    story_bullet_run.text = "▪ "
+    story_bullet_run.font.color.rgb = state_colors.get(story_state, RGBColor(0, 0, 0))
+    story_bullet_run.font.name = 'Segoe UI Light'
+    
+    story_id_run = story_para.add_run()
+    story_id_run.text = f"US {story['id']}: "
+    story_id_run.font.bold = True
+    story_id_run.font.name = 'Segoe UI Light'
+
+    story_title_run = story_para.add_run()
+    story_title_run.text = f"{story['title']}"
+    story_title_run.font.bold = False
+    story_title_run.font.name = 'Segoe UI Light'
+
+def update_presentation_with_user_stories(user_stories, template_path, slide_index):
     
     prs = Presentation(template_path)
     slide = prs.slides[slide_index]
@@ -123,37 +165,20 @@ def update_presentation_with_user_stories(user_stories, template_path, slide_ind
     # Group stories by feature
     stories_by_feature = defaultdict(list)
     for story in user_stories:
-        stories_by_feature[story['feature']].append(story)
+        feature = story['feature']
+        feature_id = feature['id']
+        stories_by_feature[feature_id, feature['title'], feature['state']].append(story)
 
-    # Add grouped stories to the slide
-    for feature, stories in stories_by_feature.items():
-        # Add the feature as a top-level bullet (level 0)
-        feature_para = text_frame.add_paragraph()
-        feature_para.text = f"{feature}:"
-        feature_para.level = 0
-        feature_para.bold = True
-        feature_para.bullet = True
-        feature_para.bullet_style = 3  # Square bullets for feature
+    for (feature_id, feature_title, feature_state), stories in stories_by_feature.items():
+        create_feature_row(feature_id, feature_title, feature_state, text_frame)
 
         # Add user stories under this feature as second-level bullets (level 1)
         for story in stories:
-            story_para = text_frame.add_paragraph()
-            story_para.text = f"{story['id']} [{story['title']}]"
-            story_para.level = 1
-            story_para.bullet = True
-            story_para.bullet_style = 2  # Square bullets for user stories
-            story_para.left_indent = Inches(0.5)  # Indentation for sub-level
-            # Set text color based on story state
-            state = story.get("state", "")
-            run = story_para.runs[0]
-            run.font.color.rgb = state_colors.get(state, RGBColor(0, 0, 0))  # fallback to black
+            create_user_story_row(story, text_frame)
 
-
-    # Save the updated presentation
     filename = f"MeetingMinutes-{datetime.today().strftime('%d%m%Y')}-SprintReview.pptx"
     prs.save(filename)
     print(f"Saved: {filename}")
-
 
 
 # Get work items in the iteration (Sprint)
